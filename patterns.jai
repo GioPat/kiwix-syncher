@@ -3,7 +3,7 @@ PatternPart :: struct {
     content: string; // For LITERAL: The literal text
     variable_name: string; // For VARIABLE: The variable name
     choices: [..] string; // For CHOICE: The possible options
-};
+}
 
 PatternResult :: struct {
   valid: bool;
@@ -12,7 +12,7 @@ PatternResult :: struct {
 
 extract_from_pattern :: (input: string, pattern: string) -> PatternResult {
   result: PatternResult;
-  result.valid = true;
+  result.valid = false;
   // Parse the pattern into parts
   pattern_parts := parse_patterns(pattern);
   // Match against input
@@ -60,13 +60,14 @@ extract_from_pattern :: (input: string, pattern: string) -> PatternResult {
         input_pos = end_pos;
       case .CHOICE;
         matched := false;
+        print("Matching choice: %\n", it.choices);
         for choice: it.choices {
           if input_pos + choice.count <= input.count {
             input_part := slice(input, input_pos, choice.count);
             if input_part == choice {
               input_pos += choice.count;
               matched = true;
-              break choice;
+              break;
             }
           }
         }
