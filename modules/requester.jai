@@ -1,4 +1,10 @@
+
 size_t :: u64;
+
+Download_Content :: struct {
+    file: *File;
+    curl: *CURL;
+}
 
 request :: (url: string, data: string = "", method: string = "", headers: [] string = .[], include_headers: bool = false, setopt: (curl: *CURL)->()=null, getinfo: (curl: *CURL)->()=null) -> res: Curl_Response {
     curl := curl_easy_init();
@@ -70,6 +76,64 @@ request :: (url: string, data: string = "", method: string = "", headers: [] str
 
 get    :: #bake_arguments request(method="GET");
 
+print_curl_stats :: (curl: *CURL) {
+    // Fetch and print stats
+    total_time      : float64;
+    download_speed  : float64;
+    size_downloaded : float64;
+
+    curl_easy_getinfo(curl, .TOTAL_TIME,     *total_time);
+    curl_easy_getinfo(curl, .SPEED_DOWNLOAD, *download_speed);
+    curl_easy_getinfo(curl, .SIZE_DOWNLOAD,  *size_downloaded);
+
+    print("Time: %s, Speed: %MB/s, Downloaded: %MB\n", total_time, download_speed / 1024.0 / 1024.0, size_downloaded / 1024.0 / 1024.0);
+}
+
+// Curl expects a C function, that's why we have to use #c_call, and since #c_call doesn't provide a context and JAI function need it, we push_context
+write_download_callback :: (contents: *u8, count: u64, size: u64, download_content: *Download_Content) -> u64 #c_call {
+    total_size := count * size;
+    push_context {
+        // Write data to the file
+        file_write(download_content.file, contents, cast(s64) total_size);
+
+        // Print stats
+        print_curl_stats(download_content.curl);
+    }
+
+    return total_size;
+}
+
+
+download :: (url: string, target: string) -> bool {
+    curl := curl_easy_init();
+    if !curl {
+        log_error("An error occured while initting up the Curl connection, but Curl doesn't tell us why.");
+        return false;
+    }
+    defer curl_easy_cleanup(curl);
+    curl_easy_setopt(curl, .URL, temp_c_string(url));
+    curl_easy_setopt(curl, .FOLLOWLOCATION, 1); // follow redirect
+
+    out_file, ok := file_open(target, for_writing=true);
+    if !ok {
+        log_error("An error occured while opening the file % for storing the download.", target);
+        return false;
+    }
+    defer file_close(*out_file);
+    download_content: Download_Content;
+    download_content.file = *out_file;
+    download_content.curl = curl;
+    curl_easy_setopt(curl, .WRITEFUNCTION, write_download_callback);
+    curl_easy_setopt(curl, .WRITEDATA, *download_content);
+    error_code := curl_easy_perform(curl);
+    if error_code != .OK {
+        error_message := to_string(curl_easy_strerror(error_code));
+        defer free(error_message);
+        log_error("Curl Error: %", error_message);
+        return false;
+    }
+    return true;
+}
 
 Curl_Response :: struct {
     body          : string;
@@ -159,3 +223,4 @@ free :: (using res: Curl_Response) {
 #import "Hash_Table";
 #import "Basic";
 #import "String";
+#import "File";

@@ -27,6 +27,7 @@ main :: () {
         if occurrences.count == 0 {
             continue;
         }
+        // TODO: Salvare i file da cancellare dopo il download
         for occurrences {
             found_zim := slice(body, it.start + zim_search_prefix_len, it.end - it.start - zim_search_prefix_len);
             pattern_result := extract_from_pattern(found_zim, pattern);
@@ -65,7 +66,13 @@ main :: () {
         }
     }
     for el: zim_to_download {
-        log("Downloading ZIM file % with URL %", el.name_without_date, el.download_url, flags=Log_Flags.VERBOSE_ONLY);
+        zim_index := find_index_from_right(el.name_without_date, ".zim");
+        string_before_zim := slice(el.name_without_date, 0, zim_index - 1);
+        calendar_time := to_calendar(el.time);
+        
+        zim_file_name := sprint("%_%-%.zim", string_before_zim, formatInt(calendar_time.year, minimum_digits=4), formatInt(calendar_time.month_starting_at_0 + 1, minimum_digits=2));
+        output_path := join(config.watching_dir, "/", zim_file_name);
+        download(el.download_url, output_path);
         // zim_file_path := join(config.watching_dir, zim_metadata.name_without_date);
         // if file_exists(zim_file_path) {
         //     print("[INFO] ZIM file % already exists, skipping download\n", zim_file_path);
