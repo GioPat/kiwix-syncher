@@ -1,81 +1,85 @@
 // Software that enables ZIM scraping and updates
 VERSION :: "0.1.0";
 
-Config :: struct {
-    base_url: string;
-    poll_period: u64;
-    watching_dir: string;
-    watching_zim_patterns: [..] string;
-}
-
-read_config :: (file_content: string) -> Config {
-    config := parse_config(file_content);
-    returning_config: Config;
-    defer free_config(config);
-
-    global_found, global_config := table_find_new(*config, "global");
-    if !global_found {
-        print("Global configuration not found.\n");
-        free_config(config);
-        exit(1);
-    }
-    base_url_found, base_url := table_find_new(global_config.object, "base_url");
-    poll_period_found, poll_period := table_find_new(global_config.object, "poll_period_minutes");
-    watching_dir_found, watching_dir := table_find_new(global_config.object, "watching_directory");
-    watching_zim_patterns_found, watching_zim_patterns := table_find_new(*config, "watching_zims");
-
-    if !base_url_found || !poll_period_found || !watching_dir_found || !watching_zim_patterns_found {
-        print("Config not valid\n");
-        free_config(config);
-        exit(1);
-    }
-    zim_patterns: [..] string;
-    for pattern: watching_zim_patterns.array {
-        array_add(*zim_patterns, pattern.str);
-    }
-    returning_config.base_url = base_url.str;
-    returning_config.poll_period = cast(u64) poll_period.number;
-    returning_config.watching_zim_patterns = zim_patterns;
-    returning_config.watching_dir = watching_dir.str;
-    print("Base URL: %\n", base_url);
-    return returning_config;
-}
 
 main :: () {
-    print("Reading Config file config.cfg \n");
+    log("Kiwix scraper version % by GioPat (gyo15@hotmail.it)", VERSION);
     file := read_entire_file("config.cfg");
     config := read_config(file);
-    print("Making request to KIWIX library...\n");
+    print_config(config);
+    zim_search_prefix_len := config.zim_search_prefix.count;
     dir := get_working_directory();
-    print("Current working directory: %\n", dir);
-    files := file_list(config.watching_dir);
-    if files.count == 0 {
-        print("No files found in the watching directory: %\n", config.watching_dir);
-        exit(0);
+    log("Current working directory: %", dir, flags=Log_Flags.VERBOSE_ONLY);
+    files := list_files(config.watching_dir);
+    existing_zims: Table(string, Zim_Metadata);
+    for file: files {
+        zim_metadata := extract_zim_metadata(file);
+        table_add(*existing_zims, zim_metadata.name_without_date, zim_metadata);
     }
-    // watching_zim_patterns := string.["xxxx"];
-    // res := get(base_url);
-    // defer free(res);
-    // body := res.body;
-    // start_idx := 0;
-    // files: [..] string;
-    // files.allocator = temp;
-    // occurrences := find_occurrences_of_wrap(body, "devdocs_", ".zim");
-    // for occurrences {
-    //     url := slice(body, it.start, it.end - it.start);
-    //     array_add(*files, url);
-    // }
-    // print("Found % files\n", files.count);
-    // print("First file is: %\n", files[0]);
-    // pattern_result := extract_from_pattern(files[0], watching_zim_patterns[0]);
-    // if pattern_result.valid {
-    //     found, date := table_find_new(*pattern_result.variables, "date");
-    //     if found {
-    //         print("Extracted date: %\n", date);
-    //     }
-    // } else {
-    //     print("Pattern extraction failed.\n");
-    // }
+    // A table storing the zim to download
+    zim_to_download: Table(string, Zim_Metadata);
+    for watching_zim: config.watching_zim_patterns {
+        url, pattern := get_url_and_pattern(config.base_url, watching_zim);
+        res := get(url);
+        defer free(res);
+        body := res.body;
+        occurrences := find_occurrences_of_wrap(res.body, config.zim_search_prefix, ".zim");
+        if occurrences.count == 0 {
+            continue;
+        }
+        for occurrences {
+            found_zim := slice(body, it.start + zim_search_prefix_len, it.end - it.start - zim_search_prefix_len);
+            pattern_result := extract_from_pattern(found_zim, pattern);
+            if !pattern_result.valid {
+                continue;
+            }
+            date_found, date_variable_info := table_find_new(*pattern_result.variables, "date");
+            if !date_found {
+                log_error("The found zim % did not return any [date] variable, kindly recheck your patterns", found_zim);
+                continue;
+            }
+            zim_before_date := slice(found_zim, 0, date_variable_info.start_index);
+            zim_after_date := slice(found_zim, date_variable_info.end_index, found_zim.count - date_variable_info.end_index);
+            zim_without_date := join(zim_before_date, zim_after_date);
+            metadata: Zim_Metadata;
+            metadata.name_without_date = zim_without_date;
+            metadata.original_file_name = found_zim;
+            metadata.download_url = join(url, found_zim);
+            time := zim_date_to_apollo(date_variable_info.value);
+            metadata.time = time;
+            found_existing_zim, existing_zim := table_find_new(*existing_zims, zim_without_date);
+            if !found_existing_zim {
+                found_downloading_zim, downloading_zim := table_find_new(*zim_to_download, zim_without_date);
+                if found_downloading_zim && downloading_zim.time >= time {
+                    continue;
+                } else {
+                    table_set(*zim_to_download, zim_without_date, metadata);
+                }
+            } else {
+                if existing_zim.time < time {
+                    table_set(*zim_to_download, zim_without_date, metadata);
+                } else {
+                    continue;
+                }
+            }
+        }
+    }
+    for el: zim_to_download {
+        log("Downloading ZIM file % with URL %", el.name_without_date, el.download_url, flags=Log_Flags.VERBOSE_ONLY);
+        // zim_file_path := join(config.watching_dir, zim_metadata.name_without_date);
+        // if file_exists(zim_file_path) {
+        //     print("[INFO] ZIM file % already exists, skipping download\n", zim_file_path);
+        //     continue;
+        // }
+        // res := get(zim_metadata.download_url);
+        // defer free(res);
+        // if res.status_code != 200 {
+        //     print("[ERROR] Failed to download ZIM file %: HTTP status code %\n", zim_metadata.download_url, res.status_code);
+        //     continue;
+        // }
+        // write_entire_file(zim_file_path, res.body);
+        // print("[INFO] Successfully downloaded ZIM file to %\n", zim_file_path);
+    }
     return;
 }
 
@@ -87,3 +91,4 @@ main :: () {
 #import "requester";
 #load "strings.jai";
 #load "patterns.jai";
+#load "utils.jai";

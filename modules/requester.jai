@@ -7,6 +7,7 @@ request :: (url: string, data: string = "", method: string = "", headers: [] str
 
     // url
     curl_easy_setopt(curl, .URL, temp_c_string(url));
+    curl_easy_setopt(curl, .FOLLOWLOCATION, 1); // follow redirects
 
     // method
     if method {

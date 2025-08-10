@@ -5,9 +5,15 @@ PatternPart :: struct {
     choices: [..] string; // For CHOICE: The possible options
 }
 
+Variable_Info :: struct {
+  start_index: s64;
+  end_index: s64;
+  value: string;
+}
+
 PatternResult :: struct {
   valid: bool;
-  variables: Table(string, string);
+  variables: Table(string, Variable_Info);
 }
 
 extract_from_pattern :: (input: string, pattern: string) -> PatternResult {
@@ -19,7 +25,7 @@ extract_from_pattern :: (input: string, pattern: string) -> PatternResult {
   input_pos := 0;
   for pattern_parts {
     if it.type == {
-      case .LITERAL;
+      case .LITERAL;        
         if input_pos + it.content.count > input.count return result;
         input_part := slice(input, input_pos, it.content.count);
         if input_part != it.content return result;
@@ -54,22 +60,33 @@ extract_from_pattern :: (input: string, pattern: string) -> PatternResult {
           }
         }
         if end_pos <= start_pos return result; // No content found
-
+        
         var_value := slice(input, start_pos, end_pos - start_pos);
-        table_set(*result.variables, it.variable_name, var_value);
+        var_info: Variable_Info;
+        var_info.start_index = start_pos;
+        var_info.end_index = end_pos;
+        var_info.value = var_value;
+        table_set(*result.variables, it.variable_name, var_info);
         input_pos = end_pos;
       case .CHOICE;
         matched := false;
-        print("Matching choice: %\n", it.choices);
+        best_match: string;
+        best_match_length := 0;
         for choice: it.choices {
-          if input_pos + choice.count <= input.count {
-            input_part := slice(input, input_pos, choice.count);
-            if input_part == choice {
-              input_pos += choice.count;
-              matched = true;
-              break;
+          choice_trimmed := trim(choice);
+          if choice_trimmed.count == 0 continue; // Skip empty choices
+
+          if input_pos + choice_trimmed.count <= input.count {
+            input_part := slice(input, input_pos, choice_trimmed.count);
+            if input_part == choice_trimmed && choice_trimmed.count > best_match_length {
+              best_match = choice_trimmed;
+              best_match_length = choice_trimmed.count;
             }
           }
+        }
+        if best_match_length > 0 {
+          input_pos += best_match_length;
+          matched = true;
         }
         if !matched return result; // No match found
     }
@@ -109,10 +126,15 @@ parse_patterns :: (pattern: string) -> [..] PatternPart {
         // This is a choice pattern
         part: PatternPart;
         part.type = .CHOICE;
+        adding_choices: [..] string;
         choices := split(bracket_content, "|");
         for choices {
-          array_add(*part.choices, it);
+          trimmed := trim(it);
+          if trimmed.count > 0 {
+            array_add(*adding_choices, trimmed);
+          }
         }
+        part.choices = adding_choices;
         array_add(*parts, part);
       } else {
         // Regular variable
