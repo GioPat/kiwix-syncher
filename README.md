@@ -27,7 +27,7 @@ First build it using linux (WSL2 on windows) using the commands above and then r
 Make sure to mount the following volumes (Docker, Podman or Kubernetes):
 
 - zims directory (check also the config `global.watching_directory`)
-- `config.cfg` in `/home/kiwix-monitor/config.cfg`
+- `config.cfg` in `/home/kiwix-syncher/config.cfg`
 
 ## Current limitations and potential improvements
 

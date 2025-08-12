@@ -2,7 +2,7 @@
   set_build_options_dc(.{do_output=false});
 
   make_directory_if_it_does_not_exist("./bin/");
-  w := compiler_create_workspace("monitor");
+  w := compiler_create_workspace("syncher");
   options := get_build_options(w);
   args := options.compile_time_command_line;
   import_path: [..] string;
@@ -15,7 +15,7 @@
 
 
   copy_commonly_propagated_fields(get_build_options(), *options);
-  options.output_executable_name = "monitor";
+  options.output_executable_name = "syncher";
   options.output_path = "./bin/";
   options.import_path = import_path;
   if release set_optimization(*options, .OPTIMIZED);

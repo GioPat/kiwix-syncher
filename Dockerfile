@@ -4,14 +4,14 @@ RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -s /bin/bash kiwix-monitor
+RUN useradd -m -s /bin/bash kiwix-syncher
 
-COPY ./bin/monitor /usr/local/bin/monitor
+COPY ./bin/syncher /usr/local/bin/syncher
 
-RUN chmod +x /usr/local/bin/monitor
+RUN chmod +x /usr/local/bin/syncher
 
-USER kiwix-monitor
+USER kiwix-syncher
 
-WORKDIR /home/kiwix-monitor
+WORKDIR /home/kiwix-syncher
 
-CMD ["/usr/local/bin/monitor"]
+CMD ["/usr/local/bin/syncher"]
