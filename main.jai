@@ -1,15 +1,7 @@
-// Software that enables ZIM scraping and updates
 VERSION :: "0.1.0";
 
-
-main :: () {
-    log("Kiwix scraper version % by GioPat (gyo15@hotmail.it)", VERSION);
-    file := read_entire_file("config.cfg");
-    config := read_config(file);
-    print_config(config);
+process :: (config: Config) {
     zim_search_prefix_len := config.zim_search_prefix.count;
-    dir := get_working_directory();
-    log("Current working directory: %", dir, flags=Log_Flags.VERBOSE_ONLY);
     files := list_files(config.watching_dir);
     existing_zims: Table(string, Zim_Metadata);
     for file: files {
@@ -18,6 +10,10 @@ main :: () {
     }
     // A table storing the zim to download
     zim_to_download: Table(string, Zim_Metadata);
+
+    // A table storing the outdated zims to be removed
+    zim_to_be_removed: Table(string, Zim_Metadata);
+
     for watching_zim: config.watching_zim_patterns {
         url, pattern := get_url_and_pattern(config.base_url, watching_zim);
         res := get(url);
@@ -27,7 +23,6 @@ main :: () {
         if occurrences.count == 0 {
             continue;
         }
-        // TODO: Salvare i file da cancellare dopo il download
         for occurrences {
             found_zim := slice(body, it.start + zim_search_prefix_len, it.end - it.start - zim_search_prefix_len);
             pattern_result := extract_from_pattern(found_zim, pattern);
@@ -58,6 +53,7 @@ main :: () {
                 }
             } else {
                 if existing_zim.time < time {
+                    table_set(*zim_to_be_removed, zim_without_date, existing_zim);
                     table_set(*zim_to_download, zim_without_date, metadata);
                 } else {
                     continue;
@@ -73,22 +69,30 @@ main :: () {
         zim_file_name := sprint("%_%-%.zim", string_before_zim, formatInt(calendar_time.year, minimum_digits=4), formatInt(calendar_time.month_starting_at_0 + 1, minimum_digits=2));
         output_path := join(config.watching_dir, "/", zim_file_name);
         download(el.download_url, output_path);
-        // zim_file_path := join(config.watching_dir, zim_metadata.name_without_date);
-        // if file_exists(zim_file_path) {
-        //     print("[INFO] ZIM file % already exists, skipping download\n", zim_file_path);
-        //     continue;
-        // }
-        // res := get(zim_metadata.download_url);
-        // defer free(res);
-        // if res.status_code != 200 {
-        //     print("[ERROR] Failed to download ZIM file %: HTTP status code %\n", zim_metadata.download_url, res.status_code);
-        //     continue;
-        // }
-        // write_entire_file(zim_file_path, res.body);
-        // print("[INFO] Successfully downloaded ZIM file to %\n", zim_file_path);
+        outdated_zim_found, outdated_zim := table_find_new(*zim_to_be_removed, el.name_without_date);
+        if outdated_zim_found {
+            zim_file_path := join(config.watching_dir, "/", outdated_zim.original_file_name);
+            if file_exists(zim_file_path) {
+                file_delete(zim_file_path);
+            }
+        }
     }
     return;
 }
+
+main :: () {
+    log("Kiwix ZIM syncer version % by GioPat (gyo15@hotmail.it)", VERSION);
+    dir := get_working_directory();
+    log("Current working directory: %", dir, flags=Log_Flags.VERBOSE_ONLY);
+    file := read_entire_file("config.cfg");
+    config := read_config(file);
+    print_config(config);
+    while true {
+        process(config);
+        sleep_milliseconds(cast(s32, config.cooldown_minutes * 60 * 1000));
+    }
+}
+
 
 #import "File";
 #import "File_Utilities";

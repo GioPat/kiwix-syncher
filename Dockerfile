@@ -1,25 +1,17 @@
-# Use Ubuntu 24.04 LTS
 FROM ubuntu:24.04
 
-# Install minimal runtime dependencies
 RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN useradd -m -s /bin/bash jai-user
+RUN useradd -m -s /bin/bash kiwix-monitor
 
-# Copy your Jai executable
-COPY main /usr/local/bin/app
+COPY ./bin/monitor /usr/local/bin/monitor
 
-# Make it executable
-RUN chmod +x /usr/local/bin/app
+RUN chmod +x /usr/local/bin/monitor
 
-# Switch to non-root user
-USER jai-user
+USER kiwix-monitor
 
-# Set working directory
-WORKDIR /home/jai-user
+WORKDIR /home/kiwix-monitor
 
-# Run the executable
-CMD ["/usr/local/bin/app"]
+CMD ["/usr/local/bin/monitor"]
