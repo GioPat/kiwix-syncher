@@ -4,6 +4,7 @@ size_t :: u64;
 Download_Content :: struct {
     file: *File;
     curl: *CURL;
+    verbose: bool = false;
 }
 
 request :: (url: string, data: string = "", method: string = "", headers: [] string = .[], include_headers: bool = false, setopt: (curl: *CURL)->()=null, getinfo: (curl: *CURL)->()=null) -> res: Curl_Response {
@@ -95,16 +96,14 @@ write_download_callback :: (contents: *u8, count: u64, size: u64, download_conte
     push_context {
         // Write data to the file
         file_write(download_content.file, contents, cast(s64) total_size);
-
-        // Print stats
-        print_curl_stats(download_content.curl);
+        if download_content.verbose print_curl_stats(download_content.curl);
     }
 
     return total_size;
 }
 
 
-download :: (url: string, target: string) -> bool {
+download :: (url: string, target: string, verbose: bool = false) -> bool {
     curl := curl_easy_init();
     if !curl {
         log_error("An error occured while initting up the Curl connection, but Curl doesn't tell us why.");
@@ -112,7 +111,7 @@ download :: (url: string, target: string) -> bool {
     }
     defer curl_easy_cleanup(curl);
     curl_easy_setopt(curl, .URL, temp_c_string(url));
-    curl_easy_setopt(curl, .FOLLOWLOCATION, 1); // follow redirect
+    curl_easy_setopt(curl, .FOLLOWLOCATION, 1);
 
     out_file, ok := file_open(target, for_writing=true);
     if !ok {
@@ -123,6 +122,7 @@ download :: (url: string, target: string) -> bool {
     download_content: Download_Content;
     download_content.file = *out_file;
     download_content.curl = curl;
+    download_content.verbose = verbose;
     curl_easy_setopt(curl, .WRITEFUNCTION, write_download_callback);
     curl_easy_setopt(curl, .WRITEDATA, *download_content);
     error_code := curl_easy_perform(curl);

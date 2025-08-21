@@ -3,6 +3,7 @@ Config :: struct {
     base_url: string;
     cooldown_minutes: u64;
     watching_dir: string;
+    verbose: bool;
     watching_zim_patterns: [..] string;
     zim_search_prefix: string;
 }
@@ -30,6 +31,7 @@ read_config :: (file_content: string) -> Config {
     watching_dir_found, watching_dir := table_find_new(global_config.object, "watching_directory");
     watching_zim_patterns_found, watching_zim_patterns := table_find_new(*config, "watching_zims");
     zim_search_prefix_found, zim_search_prefix := table_find_new(global_config.object, "zim_search_prefix");
+    verbose_found, verbose := table_find_new(global_config.object, "verbose");
     if !zim_search_prefix_found {
         zim_search_prefix.str = "alt=\"[   ]\"> <a href=\""; // Default prefix if not found
     }
@@ -43,6 +45,8 @@ read_config :: (file_content: string) -> Config {
     for pattern: watching_zim_patterns.array {
         array_add(*zim_patterns, pattern.str);
     }
+    returning_config.verbose = ifx verbose_found then verbose.boolean else false;
+
     returning_config.base_url = base_url.str;
     returning_config.cooldown_minutes = cast(u64) cooldown_minutes.number;
     returning_config.watching_zim_patterns = zim_patterns;

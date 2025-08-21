@@ -68,7 +68,7 @@ process :: (config: Config) {
         
         zim_file_name := sprint("%_%-%.zim", string_before_zim, formatInt(calendar_time.year, minimum_digits=4), formatInt(calendar_time.month_starting_at_0 + 1, minimum_digits=2));
         output_path := join(config.watching_dir, "/", zim_file_name);
-        download(el.download_url, output_path);
+        download(el.download_url, output_path, config.verbose);
         outdated_zim_found, outdated_zim := table_find_new(*zim_to_be_removed, el.name_without_date);
         if outdated_zim_found {
             zim_file_path := join(config.watching_dir, "/", outdated_zim.original_file_name);
