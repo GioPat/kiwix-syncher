@@ -20,6 +20,12 @@ And then run it.
 
 ## Container
 
+### Use the pre built image
+
+`docker run --volume config.cfg:/home/kiwix-monitor/config.cfg --volume zims-docker:/home/kiwix-monitor/zims giopat15/kiwix-syncher:0.1.0`
+
+### Build it your own
+
 First build it using linux (WSL2 on windows) using the commands above and then run the following:
 
 `docker build -t kiwix-syncer .`
