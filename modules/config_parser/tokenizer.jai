@@ -97,9 +97,10 @@ next_token :: (t: *Tokenizer) -> Token {
           token.kind = Token_Kind.RBRACKET;
         case #char ",";
           token.kind = Token_Kind.COMMA;
+        case #char "'"; #through;
         case #char "\"";
           start := t.index;
-          while t.index < t.src.count && peek(t) != #char "\"" {
+          while t.index < t.src.count && peek(t) != c {
               advance(t);
           }
           token.text = slice(t.src, start, t.index - start);

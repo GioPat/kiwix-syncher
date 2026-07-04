@@ -1,4 +1,4 @@
-VERSION :: "0.1.0";
+VERSION :: "0.1.1";
 
 process :: (config: Config) {
     zim_search_prefix_len := config.zim_search_prefix.count;
@@ -29,7 +29,7 @@ process :: (config: Config) {
             if !pattern_result.valid {
                 continue;
             }
-            date_found, date_variable_info := table_find_new(*pattern_result.variables, "date");
+            date_found, date_variable_info := table_find(*pattern_result.variables, "date");
             if !date_found {
                 log_error("The found zim % did not return any [date] variable, kindly recheck your patterns", found_zim);
                 continue;
@@ -43,9 +43,9 @@ process :: (config: Config) {
             metadata.download_url = join(url, found_zim);
             time := zim_date_to_apollo(date_variable_info.value);
             metadata.time = time;
-            found_existing_zim, existing_zim := table_find_new(*existing_zims, zim_without_date);
+            found_existing_zim, existing_zim := table_find(*existing_zims, zim_without_date);
             if !found_existing_zim {
-                found_downloading_zim, downloading_zim := table_find_new(*zim_to_download, zim_without_date);
+                found_downloading_zim, downloading_zim := table_find(*zim_to_download, zim_without_date);
                 if found_downloading_zim && downloading_zim.time >= time {
                     continue;
                 } else {
@@ -69,7 +69,7 @@ process :: (config: Config) {
         zim_file_name := sprint("%_%-%.zim", string_before_zim, formatInt(calendar_time.year, minimum_digits=4), formatInt(calendar_time.month_starting_at_0 + 1, minimum_digits=2));
         output_path := join(config.watching_dir, "/", zim_file_name);
         download(el.download_url, output_path, config.verbose);
-        outdated_zim_found, outdated_zim := table_find_new(*zim_to_be_removed, el.name_without_date);
+        outdated_zim_found, outdated_zim := table_find(*zim_to_be_removed, el.name_without_date);
         if outdated_zim_found {
             zim_file_path := join(config.watching_dir, "/", outdated_zim.original_file_name);
             if file_exists(zim_file_path) {

@@ -168,7 +168,6 @@ header_callback :: (ptr: *u8, size: size_t, nmemb: size_t, userdata: *void) -> s
 
 parse_headers :: (headers: string) -> headers_table: Table(string, string) {
     headers_table: Table(string, string);
-    init(*headers_table);
 
     if !headers return headers_table;
 

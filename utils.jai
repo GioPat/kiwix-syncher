@@ -20,20 +20,20 @@ read_config :: (file_content: string) -> Config {
     returning_config: Config;
     defer free_config(config);
 
-    global_found, global_config := table_find_new(*config, "global");
+    global_found, global_config := table_find(*config, "global");
     if !global_found {
         log_error("Global configuration not found.");
         free_config(config);
         exit(1);
     }
-    base_url_found, base_url := table_find_new(global_config.object, "base_url");
-    cooldown_minutes_found, cooldown_minutes := table_find_new(global_config.object, "cooldown_minutes");
-    watching_dir_found, watching_dir := table_find_new(global_config.object, "watching_directory");
-    watching_zim_patterns_found, watching_zim_patterns := table_find_new(*config, "watching_zims");
-    zim_search_prefix_found, zim_search_prefix := table_find_new(global_config.object, "zim_search_prefix");
-    verbose_found, verbose := table_find_new(global_config.object, "verbose");
+    base_url_found, base_url := table_find(global_config.object, "base_url");
+    cooldown_minutes_found, cooldown_minutes := table_find(global_config.object, "cooldown_minutes");
+    watching_dir_found, watching_dir := table_find(global_config.object, "watching_directory");
+    watching_zim_patterns_found, watching_zim_patterns := table_find(*config, "watching_zims");
+    zim_search_prefix_found, zim_search_prefix := table_find(global_config.object, "zim_search_prefix");
+    verbose_found, verbose := table_find(global_config.object, "verbose");
     if !zim_search_prefix_found {
-        zim_search_prefix.str = "alt=\"[   ]\"> <a href=\""; // Default prefix if not found
+        zim_search_prefix.str = "<a href=\""; // Default prefix if not found
     }
 
     if !base_url_found || !cooldown_minutes_found || !watching_dir_found || !watching_zim_patterns_found {
