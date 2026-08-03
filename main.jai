@@ -1,4 +1,4 @@
-VERSION :: "0.1.1";
+VERSION :: "0.2.0";
 
 process :: (config: Config) -> changed: bool {
     zim_search_prefix_len := config.zim_search_prefix.count;
@@ -18,9 +18,21 @@ process :: (config: Config) -> changed: bool {
         url, pattern := get_url_and_pattern(config.base_url, watching_zim);
         res := get(url);
         defer free(res);
+        // Without these checks a TLS, DNS or HTTP failure is indistinguishable
+        // from a directory that legitimately has no matching ZIM: the body comes
+        // back empty and the pattern quietly matches nothing.
+        if res.curl_code != .OK {
+            log_error("Request to % failed (curl code: %).", url, res.curl_code);
+            continue;
+        }
+        if res.code != 200 {
+            log_error("Request to % returned HTTP status %.", url, res.code);
+            continue;
+        }
         body := res.body;
         occurrences := find_occurrences_of_wrap(res.body, config.zim_search_prefix, ".zim");
         if occurrences.count == 0 {
+            log("No ZIM matching % found at %.", pattern, url, flags=Log_Flags.VERBOSE_ONLY);
             continue;
         }
         for occurrences {
@@ -102,10 +114,14 @@ process :: (config: Config) -> changed: bool {
 
 main :: () {
     log("Kiwix ZIM syncer version % by GioPat (gyo15@hotmail.it)", VERSION);
-    dir := get_working_directory();
-    log("Current working directory: %", dir, flags=Log_Flags.VERBOSE_ONLY);
     file := read_entire_file("config.cfg");
     config := read_config(file);
+    // Has to happen before anything logs with VERBOSE_ONLY, otherwise every
+    // verbose line - the whole config dump included - is discarded no matter
+    // what `verbose` is set to in the config.
+    if config.verbose  context.log_level = .VERBOSE;
+    dir := get_working_directory();
+    log("Current working directory: %", dir, flags=Log_Flags.VERBOSE_ONLY);
     print_config(config);
     while true {
         changed := process(config);
