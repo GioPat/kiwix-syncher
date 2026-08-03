@@ -6,6 +6,7 @@ Config :: struct {
     verbose: bool;
     watching_zim_patterns: [..] string;
     zim_search_prefix: string;
+    on_sync_complete: string;
 }
 
 Zim_Metadata :: struct {
@@ -32,6 +33,7 @@ read_config :: (file_content: string) -> Config {
     watching_zim_patterns_found, watching_zim_patterns := table_find(*config, "watching_zims");
     zim_search_prefix_found, zim_search_prefix := table_find(global_config.object, "zim_search_prefix");
     verbose_found, verbose := table_find(global_config.object, "verbose");
+    on_sync_complete_found, on_sync_complete := table_find(global_config.object, "on_sync_complete");
     if !zim_search_prefix_found {
         zim_search_prefix.str = "<a href=\""; // Default prefix if not found
     }
@@ -46,6 +48,7 @@ read_config :: (file_content: string) -> Config {
         array_add(*zim_patterns, pattern.str);
     }
     returning_config.verbose = ifx verbose_found then verbose.boolean else false;
+    returning_config.on_sync_complete = ifx on_sync_complete_found then on_sync_complete.str else "";
 
     returning_config.base_url = base_url.str;
     returning_config.cooldown_minutes = cast(u64) cooldown_minutes.number;
@@ -65,6 +68,9 @@ print_config :: (config: Config) {
       log("  - %", pattern, flags=Log_Flags.VERBOSE_ONLY);
   }
   log("ZIM search prefix: %", config.zim_search_prefix, flags=Log_Flags.VERBOSE_ONLY);
+  if config.on_sync_complete.count > 0 {
+    log("On sync complete: %", config.on_sync_complete, flags=Log_Flags.VERBOSE_ONLY);
+  }
   log("========================", flags=Log_Flags.VERBOSE_ONLY);
 }
 

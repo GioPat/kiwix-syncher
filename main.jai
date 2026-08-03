@@ -1,6 +1,6 @@
 VERSION :: "0.1.1";
 
-process :: (config: Config) {
+process :: (config: Config) -> changed: bool {
     zim_search_prefix_len := config.zim_search_prefix.count;
     files := list_files(config.watching_dir);
     existing_zims: Table(string, Zim_Metadata);
@@ -61,14 +61,34 @@ process :: (config: Config) {
             }
         }
     }
+    changed := false;
     for el: zim_to_download {
         zim_index := find_index_from_right(el.name_without_date, ".zim");
         string_before_zim := slice(el.name_without_date, 0, zim_index - 1);
         calendar_time := to_calendar(el.time);
-        
+
         zim_file_name := sprint("%_%-%.zim", string_before_zim, formatInt(calendar_time.year, minimum_digits=4), formatInt(calendar_time.month_starting_at_0 + 1, minimum_digits=2));
         output_path := join(config.watching_dir, "/", zim_file_name);
-        download(el.download_url, output_path, config.verbose);
+
+        // Download under a temporary name and only rename once the whole file is
+        // on disk. ZIMs are identified purely by their file name, so a truncated
+        // transfer sitting at the final name would be indistinguishable from a
+        // complete one and would never be retried.
+        partial_path := join(output_path, ".part");
+        if !download(el.download_url, partial_path, config.verbose) {
+            log_error("Download of % failed, keeping the currently installed ZIM.", zim_file_name);
+            if file_exists(partial_path) file_delete(partial_path);
+            continue;
+        }
+        if !file_move(partial_path, output_path) {
+            log_error("Could not move % into place as %.", partial_path, output_path);
+            if file_exists(partial_path) file_delete(partial_path);
+            continue;
+        }
+        changed = true;
+
+        // Only reached once the replacement is safely in place, so a failed
+        // transfer can never leave the directory without a usable copy.
         outdated_zim_found, outdated_zim := table_find(*zim_to_be_removed, el.name_without_date);
         if outdated_zim_found {
             zim_file_path := join(config.watching_dir, "/", outdated_zim.original_file_name);
@@ -77,7 +97,7 @@ process :: (config: Config) {
             }
         }
     }
-    return;
+    return changed;
 }
 
 main :: () {
@@ -88,7 +108,12 @@ main :: () {
     config := read_config(file);
     print_config(config);
     while true {
-        process(config);
+        changed := process(config);
+        // Only fire when the directory actually changed, so the library is not
+        // rebuilt on every idle cycle.
+        if changed && config.on_sync_complete.count > 0 {
+            run_sync_hook(config.on_sync_complete);
+        }
         sleep_milliseconds(cast(s32, config.cooldown_minutes * 60 * 1000));
     }
 }
@@ -103,3 +128,4 @@ main :: () {
 #load "strings.jai";
 #load "patterns.jai";
 #load "utils.jai";
+#load "hooks.jai";
