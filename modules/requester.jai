@@ -128,7 +128,6 @@ download :: (url: string, target: string, verbose: bool = false) -> bool {
     error_code := curl_easy_perform(curl);
     if error_code != .OK {
         error_message := to_string(curl_easy_strerror(error_code));
-        defer free(error_message);
         log_error("Curl Error: %", error_message);
         return false;
     }

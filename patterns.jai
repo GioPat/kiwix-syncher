@@ -16,11 +16,9 @@ PatternResult :: struct {
   variables: Table(string, Variable_Info);
 }
 
-extract_from_pattern :: (input: string, pattern: string) -> PatternResult {
+extract_from_pattern :: (input: string, pattern_parts: [] PatternPart) -> PatternResult {
   result: PatternResult;
   result.valid = false;
-  // Parse the pattern into parts
-  pattern_parts := parse_patterns(pattern);
   // Match against input
   input_pos := 0;
   for pattern_parts {

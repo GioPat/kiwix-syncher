@@ -1,6 +1,9 @@
 VERSION :: "0.2.0";
 
 process :: (config: Config) -> changed: bool {
+    // Every allocation in a cycle is scratch. main() resets temporary storage
+    // after each cycle, which releases all of it in one go.
+    push_allocator(temp);
     zim_search_prefix_len := config.zim_search_prefix.count;
     files := list_files(config.watching_dir);
     existing_zims: Table(string, Zim_Metadata);
@@ -16,6 +19,7 @@ process :: (config: Config) -> changed: bool {
 
     for watching_zim: config.watching_zim_patterns {
         url, pattern := get_url_and_pattern(config.base_url, watching_zim);
+        pattern_parts := parse_patterns(pattern);
         res := get(url);
         defer free(res);
         // Without these checks a TLS, DNS or HTTP failure is indistinguishable
@@ -37,7 +41,7 @@ process :: (config: Config) -> changed: bool {
         }
         for occurrences {
             found_zim := slice(body, it.start + zim_search_prefix_len, it.end - it.start - zim_search_prefix_len);
-            pattern_result := extract_from_pattern(found_zim, pattern);
+            pattern_result := extract_from_pattern(found_zim, pattern_parts);
             if !pattern_result.valid {
                 continue;
             }
@@ -130,6 +134,7 @@ main :: () {
         if changed && config.on_sync_complete.count > 0 {
             run_sync_hook(config.on_sync_complete);
         }
+        reset_temporary_storage();
         sleep_milliseconds(cast(s32, config.cooldown_minutes * 60 * 1000));
     }
 }
