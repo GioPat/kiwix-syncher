@@ -1,4 +1,4 @@
-VERSION :: "0.2.0";
+VERSION :: "0.2.1";
 
 process :: (config: Config) -> changed: bool {
     // Every allocation in a cycle is scratch. main() resets temporary storage
