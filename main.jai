@@ -1,4 +1,4 @@
-VERSION :: "0.2.1";
+VERSION :: "0.2.2";
 
 process :: (config: Config) -> changed: bool {
     // Every allocation in a cycle is scratch. main() resets temporary storage
@@ -8,6 +8,8 @@ process :: (config: Config) -> changed: bool {
     files := list_files(config.watching_dir);
     existing_zims: Table(string, Zim_Metadata);
     for file: files {
+        // The directory also holds library.xml and partial downloads
+        if !ends_with(file, ".zim") continue;
         zim_metadata := extract_zim_metadata(file);
         table_add(*existing_zims, zim_metadata.name_without_date, zim_metadata);
     }
@@ -135,6 +137,9 @@ main :: () {
             run_sync_hook(config.on_sync_complete);
         }
         reset_temporary_storage();
+        // No-op unless built with -memdebug; the memory visualizer only receives
+        // data when the program explicitly pushes an update.
+        memory_visualizer_per_frame_update();
         sleep_milliseconds(cast(s32, config.cooldown_minutes * 60 * 1000));
     }
 }
@@ -142,7 +147,11 @@ main :: () {
 
 #import "File";
 #import "File_Utilities";
-#import "Basic";
+#if MEMORY_DEBUG {
+    #import "Basic"()(MEMORY_DEBUGGER=true, VISUALIZE_MEMORY_DEBUGGER=true);
+} else {
+    #import "Basic";
+}
 #import "Curl"()(LINUX_USE_SYSTEM_LIBRARY=true);
 #import "config_parser";
 #import "requester";

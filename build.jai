@@ -12,6 +12,7 @@
   release := array_find(args, "-release");
   release_very := array_find(args, "-very-release");
   arm := array_find(args, "-arm");
+  memdebug := array_find(args, "-memdebug");
 
 
   copy_commonly_propagated_fields(get_build_options(), *options);
@@ -22,6 +23,7 @@
   if release_very set_optimization(*options, .VERY_OPTIMIZED);
   if arm options.cpu_target = .ARM64;
   set_build_options(options, w);
+  add_build_string(tprint("MEMORY_DEBUG :: %;", memdebug), w);
   add_build_file("./main.jai", w);
   
 }

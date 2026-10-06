@@ -81,6 +81,27 @@ Make sure to mount the following volumes (Docker, Podman or Kubernetes):
 - zims directory (check also the config `global.watching_directory`)
 - `config.cfg` in `/home/kiwix-syncher/config.cfg`
 
+## Memory debugging
+
+Build with `-memdebug` to compile in Jai's memory debugger:
+
+```sh
+jai build.jai - -memdebug
+```
+
+For the live view, build the viewer once and run it. Order does not matter, the
+syncher retries the connection:
+
+```sh
+cd <jai>/examples/codex_view && jai build.jai && ./run/codex_view.exe
+```
+
+Pick **Live Allocations** in its sidebar. The syncher pushes one update per sync
+cycle, so set `cooldown_minutes: 0` to see it move. With no viewer running it
+logs `Unable to connect to a memory visualization client` and carries on.
+
+Temporary storage and pool allocations are deliberately not tracked.
+
 ## Current limitations and potential improvements
 
 - Does not support zim deletion if you remove from the watch list.
